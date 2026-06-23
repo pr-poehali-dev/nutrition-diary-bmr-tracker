@@ -62,6 +62,27 @@ const WEEK = [
 
 const MEALS: Meal[] = ['Завтрак', 'Обед', 'Ужин', 'Перекус'];
 
+interface CookMethod {
+  name: string;
+  emoji: string;
+  factor: number; // вес после / вес до по умолчанию
+}
+
+const COOK_METHODS: CookMethod[] = [
+  { name: 'Без обработки', emoji: '🥗', factor: 1 },
+  { name: 'Варка', emoji: '🍲', factor: 1.15 },
+  { name: 'Жарка', emoji: '🍳', factor: 0.75 },
+  { name: 'Запекание', emoji: '🔥', factor: 0.8 },
+  { name: 'Гриль', emoji: '🥩', factor: 0.7 },
+  { name: 'На пару', emoji: '💨', factor: 0.95 },
+];
+
+interface DishItem {
+  id: number;
+  product: Product;
+  grams: number;
+}
+
 export default function Index() {
   const [sex, setSex] = useState<Sex>('male');
   const [age, setAge] = useState(30);
@@ -75,6 +96,60 @@ export default function Index() {
     { id: 4, meal: 'Обед', product: PRODUCTS[1], grams: 150 },
   ]);
   const [search, setSearch] = useState('');
+
+  const [dish, setDish] = useState<DishItem[]>([
+    { id: 1, product: PRODUCTS[0], grams: 300 },
+    { id: 2, product: PRODUCTS[8], grams: 100 },
+  ]);
+  const [dishSearch, setDishSearch] = useState('');
+  const [method, setMethod] = useState<CookMethod>(COOK_METHODS[1]);
+  const [rawWeight, setRawWeight] = useState(400);
+  const [cookedWeight, setCookedWeight] = useState(460);
+
+  const dishRaw = useMemo(() => {
+    return dish.reduce(
+      (acc, d) => {
+        const k = d.grams / 100;
+        acc.cal += d.product.cal * k;
+        acc.p += d.product.p * k;
+        acc.f += d.product.f * k;
+        acc.c += d.product.c * k;
+        acc.g += d.grams;
+        return acc;
+      },
+      { cal: 0, p: 0, f: 0, c: 0, g: 0 }
+    );
+  }, [dish]);
+
+  const dishPer100 = useMemo(() => {
+    const w = cookedWeight > 0 ? cookedWeight : 1;
+    return {
+      cal: (dishRaw.cal / w) * 100,
+      p: (dishRaw.p / w) * 100,
+      f: (dishRaw.f / w) * 100,
+      c: (dishRaw.c / w) * 100,
+    };
+  }, [dishRaw, cookedWeight]);
+
+  const dishFiltered = PRODUCTS.filter((p) =>
+    p.name.toLowerCase().includes(dishSearch.toLowerCase())
+  );
+
+  const applyMethod = (m: CookMethod) => {
+    setMethod(m);
+    setCookedWeight(Math.round(rawWeight * m.factor));
+  };
+
+  const addDishItem = (product: Product) => {
+    setDish((d) => [...d, { id: Date.now(), product, grams: 100 }]);
+    setDishSearch('');
+  };
+
+  const setDishGrams = (id: number, grams: number) =>
+    setDish((d) => d.map((x) => (x.id === id ? { ...x, grams } : x)));
+
+  const removeDishItem = (id: number) =>
+    setDish((d) => d.filter((x) => x.id !== id));
 
   const bmr = useMemo(() => {
     const base = 10 * weight + 6.25 * height - 5 * age;
@@ -418,6 +493,197 @@ export default function Index() {
         </section>
 
         <section className="animate-rise" style={{ animationDelay: '320ms' }}>
+          <h2 className="font-display text-3xl font-medium tracking-tight mb-2">
+            Калькулятор КБЖУ блюда
+          </h2>
+          <p className="text-sm text-muted-foreground mb-6">
+            Соберите блюдо из продуктов, выберите способ готовки — мы пересчитаем
+            КБЖУ на 100 г готового продукта.
+          </p>
+
+          <div className="grid lg:grid-cols-[1fr,360px] gap-6">
+            <div className="rounded-3xl bg-card border border-border p-6 sm:p-8 space-y-6">
+              <div className="relative">
+                <Icon
+                  name="Plus"
+                  size={18}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
+                />
+                <input
+                  value={dishSearch}
+                  onChange={(e) => setDishSearch(e.target.value)}
+                  placeholder="Добавить ингредиент…"
+                  className="w-full h-12 pl-11 pr-4 rounded-2xl bg-background border border-border outline-none focus:ring-2 focus:ring-ring/40 transition-shadow"
+                />
+                {dishSearch && (
+                  <div className="absolute z-10 mt-2 w-full rounded-2xl bg-card border border-border shadow-xl overflow-hidden">
+                    {dishFiltered.length === 0 && (
+                      <p className="px-4 py-3 text-sm text-muted-foreground">
+                        Ничего не найдено
+                      </p>
+                    )}
+                    {dishFiltered.map((p) => (
+                      <button
+                        key={p.name}
+                        onClick={() => addDishItem(p)}
+                        className="flex items-center justify-between w-full px-4 py-3 hover:bg-secondary transition-colors text-left"
+                      >
+                        <span className="text-sm">{p.name}</span>
+                        <span className="text-xs text-muted-foreground tabular">
+                          {p.cal} ккал
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                {dish.map((d) => (
+                  <div
+                    key={d.id}
+                    className="group flex items-center gap-3 rounded-2xl bg-background border border-border px-4 py-3"
+                  >
+                    <span className="flex-1 text-sm font-medium truncate">
+                      {d.product.name}
+                    </span>
+                    <input
+                      type="number"
+                      value={d.grams}
+                      onChange={(e) =>
+                        setDishGrams(d.id, Math.max(0, Number(e.target.value)))
+                      }
+                      className="w-20 h-9 px-2 rounded-lg bg-card border border-border text-right tabular text-sm outline-none focus:ring-2 focus:ring-ring/40"
+                    />
+                    <span className="text-xs text-muted-foreground">г</span>
+                    <button
+                      onClick={() => removeDishItem(d.id)}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                    >
+                      <Icon name="X" size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div>
+                <span className="text-sm text-muted-foreground block mb-2">
+                  Способ приготовления
+                </span>
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+                  {COOK_METHODS.map((m) => (
+                    <button
+                      key={m.name}
+                      onClick={() => applyMethod(m)}
+                      className={`flex flex-col items-center gap-1 py-3 rounded-xl text-[11px] font-medium leading-tight transition-colors ${
+                        method.name === m.name
+                          ? 'bg-accent text-accent-foreground'
+                          : 'bg-secondary text-muted-foreground'
+                      }`}
+                    >
+                      <span className="text-lg">{m.emoji}</span>
+                      {m.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <div className="flex items-baseline justify-between mb-2">
+                    <span className="text-sm text-muted-foreground">Вес до</span>
+                    <span className="font-display text-lg tabular">
+                      {rawWeight} <span className="text-xs text-muted-foreground">г</span>
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={50}
+                    max={2000}
+                    step={10}
+                    value={rawWeight}
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      setRawWeight(v);
+                      setCookedWeight(Math.round(v * method.factor));
+                    }}
+                    className="w-full accent-[hsl(var(--accent))]"
+                  />
+                </div>
+                <div>
+                  <div className="flex items-baseline justify-between mb-2">
+                    <span className="text-sm text-muted-foreground">После</span>
+                    <span className="font-display text-lg tabular">
+                      {cookedWeight} <span className="text-xs text-muted-foreground">г</span>
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={50}
+                    max={2000}
+                    step={10}
+                    value={cookedWeight}
+                    onChange={(e) => setCookedWeight(Number(e.target.value))}
+                    className="w-full accent-[hsl(var(--accent))]"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-3xl bg-primary text-primary-foreground p-7 flex flex-col">
+              <p className="text-sm opacity-70 mb-1">На 100 г готового блюда</p>
+              <p className="font-display text-6xl font-medium tabular mb-1 text-accent">
+                {Math.round(dishPer100.cal)}
+                <span className="text-xl opacity-60 text-primary-foreground"> ккал</span>
+              </p>
+              <div className="grid grid-cols-3 gap-2 mt-5">
+                {[
+                  { l: 'Белки', v: dishPer100.p },
+                  { l: 'Жиры', v: dishPer100.f },
+                  { l: 'Углеводы', v: dishPer100.c },
+                ].map((x) => (
+                  <div
+                    key={x.l}
+                    className="rounded-xl bg-primary-foreground/10 px-3 py-3"
+                  >
+                    <p className="text-[11px] opacity-60 mb-1">{x.l}</p>
+                    <p className="font-display text-2xl tabular">
+                      {x.v.toFixed(1)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="h-px bg-primary-foreground/15 my-6" />
+
+              <p className="text-sm opacity-70 mb-3">Всё блюдо</p>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="opacity-60">Калории</span>
+                  <span className="tabular">{Math.round(dishRaw.cal)} ккал</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="opacity-60">Б · Ж · У</span>
+                  <span className="tabular">
+                    {Math.round(dishRaw.p)} · {Math.round(dishRaw.f)} ·{' '}
+                    {Math.round(dishRaw.c)} г
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="opacity-60">Уварка / ужарка</span>
+                  <span className="tabular text-accent">
+                    {rawWeight > 0
+                      ? Math.round((cookedWeight / rawWeight) * 100)
+                      : 0}
+                    %
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="animate-rise" style={{ animationDelay: '400ms' }}>
           <div className="flex items-baseline justify-between mb-6">
             <h2 className="font-display text-3xl font-medium tracking-tight">
               База рецептов
