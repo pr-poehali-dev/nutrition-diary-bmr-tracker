@@ -270,6 +270,8 @@ export default function Index() {
   const pct = Math.min(100, Math.round((totals.cal / tdee) * 100));
   const left = Math.max(0, tdee - Math.round(totals.cal));
 
+  const [selectedMeal, setSelectedMeal] = useState<Meal>('Завтрак');
+
   const filtered = PRODUCTS.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase())
   );
@@ -277,7 +279,7 @@ export default function Index() {
   const addProduct = (product: Product) => {
     setEntries((e) => [
       ...e,
-      { id: Date.now(), meal: 'Перекус', product, grams: 100 },
+      { id: Date.now(), meal: selectedMeal, product, grams: 100 },
     ]);
     setSearch('');
   };
@@ -412,39 +414,61 @@ export default function Index() {
             </span>
           </div>
 
-          <div className="relative mb-6">
-            <Icon
-              name="Search"
-              size={18}
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
-            />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Добавить продукт из базы…"
-              className="w-full h-12 pl-11 pr-4 rounded-2xl bg-card border border-border outline-none focus:ring-2 focus:ring-ring/40 transition-shadow"
-            />
-            {search && (
-              <div className="absolute z-10 mt-2 w-full rounded-2xl bg-card border border-border shadow-xl overflow-hidden">
-                {filtered.length === 0 && (
-                  <p className="px-4 py-3 text-sm text-muted-foreground">
-                    Ничего не найдено
-                  </p>
-                )}
-                {filtered.map((p) => (
-                  <button
-                    key={p.name}
-                    onClick={() => addProduct(p)}
-                    className="flex items-center justify-between w-full px-4 py-3 hover:bg-secondary transition-colors text-left"
-                  >
-                    <span className="text-sm">{p.name}</span>
-                    <span className="text-xs text-muted-foreground tabular">
-                      {p.cal} ккал / 100г
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
+          <div className="mb-6 space-y-2">
+            <div className="flex gap-1.5 p-1 rounded-xl bg-secondary w-fit">
+              {MEALS.map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setSelectedMeal(m)}
+                  className={`h-8 px-3.5 rounded-lg text-sm font-medium transition-all ${
+                    selectedMeal === m
+                      ? 'bg-card text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+            <div className="relative">
+              <Icon
+                name="Search"
+                size={18}
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
+              />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={`Добавить продукт в «${selectedMeal}»…`}
+                className="w-full h-12 pl-11 pr-4 rounded-2xl bg-card border border-border outline-none focus:ring-2 focus:ring-ring/40 transition-shadow"
+              />
+              {search && (
+                <div className="absolute z-10 mt-2 w-full rounded-2xl bg-card border border-border shadow-xl overflow-hidden">
+                  {filtered.length === 0 && (
+                    <p className="px-4 py-3 text-sm text-muted-foreground">
+                      Ничего не найдено
+                    </p>
+                  )}
+                  {filtered.map((p) => (
+                    <button
+                      key={p.name}
+                      onClick={() => addProduct(p)}
+                      className="flex items-center justify-between w-full px-4 py-3 hover:bg-secondary transition-colors text-left"
+                    >
+                      <span className="text-sm">{p.name}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-muted-foreground tabular">
+                          {p.cal} ккал / 100г
+                        </span>
+                        <span className="text-xs text-accent font-medium">
+                          → {selectedMeal}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="space-y-6">
